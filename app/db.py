@@ -75,6 +75,16 @@ class Db:
                 """
             )
 
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS mail_poll_state (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL,
+                    updated_at_iso TEXT NOT NULL
+                )
+                """
+            )
+
     def create_meeting_request(
         self,
         *,
@@ -208,3 +218,24 @@ class Db:
                 "SELECT * FROM graph_subscriptions ORDER BY created_at_iso DESC"
             ).fetchall()
             return [dict(r) for r in rows]
+
+    def get_poll_state(self, key: str) -> str | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT value FROM mail_poll_state WHERE key = ?",
+                (key,),
+            ).fetchone()
+            return None if row is None else str(row["value"])
+
+    def set_poll_state(self, *, key: str, value: str) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO mail_poll_state (key, value, updated_at_iso)
+                VALUES (?, ?, ?)
+                ON CONFLICT(key) DO UPDATE SET
+                    value = excluded.value,
+                    updated_at_iso = excluded.updated_at_iso
+                """,
+                (key, value, utc_now_iso()),
+            )

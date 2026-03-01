@@ -12,15 +12,38 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # Microsoft Graph / Entra ID
-    tenant_id: str
-    client_id: str
-    client_secret: str
-    sender_user_principal_name: str
+    # Mode
+    # - gmail_imap: Send via Gmail SMTP + read replies via IMAP polling
+    # - graph: Send/read/subscribe via Microsoft Graph webhooks (original mode)
+    mail_mode: str = "gmail_imap"
 
-    # Webhook/subscription
-    public_base_url: str
-    graph_client_state: str
+    # Gmail (SMTP + IMAP)
+    gmail_address: str | None = None
+    gmail_app_password: str | None = None
+    gmail_imap_host: str = "imap.gmail.com"
+    gmail_imap_port: int = 993
+    gmail_smtp_host: str = "smtp.gmail.com"
+    gmail_smtp_port: int = 587
+
+    # Polling (gmail_imap)
+    poll_enabled: bool = True
+    poll_interval_seconds: int = 60
+
+    # Teams meeting creation (Microsoft Graph / Entra ID)
+    teams_tenant_id: str | None = None
+    teams_client_id: str | None = None
+    teams_client_secret: str | None = None
+    teams_organizer_upn: str | None = None
+
+    # Legacy Microsoft Graph mail/webhook settings (only needed if mail_mode=graph)
+    tenant_id: str | None = None
+    client_id: str | None = None
+    client_secret: str | None = None
+    sender_user_principal_name: str | None = None
+
+    # Webhook/subscription (mail_mode=graph)
+    public_base_url: str | None = None
+    graph_client_state: str = "change-me"
 
     # Gemini
     gemini_api_key: str

@@ -3,38 +3,49 @@
 Minimal backend that:
 
 1. Creates a meeting request with attendee emails + a fixed time
-2. Sends emails via Microsoft Graph
-3. Receives Microsoft Graph webhook notifications for new inbox messages
+2. Sends emails (default: Gmail SMTP)
+3. Polls the inbox for new replies (default: Gmail IMAP polling)
 4. Uses Gemini API to classify replies as accepted/declined
-5. When **all** attendees accept, creates a Teams meeting (Graph calendar event)
+5. When **all** attendees accept, creates a Teams meeting (Microsoft Graph calendar event)
 
 ## Prerequisites
 
 - Python 3.10+
-- Microsoft 365 tenant + an Entra ID (Azure AD) App Registration
-- A publicly reachable HTTPS URL for the webhook (e.g. ngrok)
+- Google account (Gmail) with **2FA enabled** + a **Gmail App Password** (for SMTP/IMAP)
+- Microsoft 365 tenant + an Entra ID (Azure AD) App Registration (used to create the Teams meeting link)
+
+Note: The original Microsoft Graph webhook mode is still available, but the default setup is Gmail + polling (no webhook required).
 
 ## Microsoft Graph permissions (App-only)
+
+### For Teams meeting creation (Graph calendar event)
+
+In App Registration → **API permissions** → Microsoft Graph → **Application permissions**:
+
+- `Calendars.ReadWrite`
+
+(Depending on your tenant policies, you may also need online meeting permissions such as `OnlineMeetings.ReadWrite.All`.)
+
+Then **Grant admin consent**.
+
+### Only if using Microsoft Graph mail/webhook mode (`MAIL_MODE=graph`)
 
 In App Registration → **API permissions** → Microsoft Graph → **Application permissions**:
 
 - `Mail.Send`
 - `Mail.Read`
-- `Calendars.ReadWrite`
-- `Subscriptions.Read.All`
-
-Then **Grant admin consent**.
+- `Subscriptions.ReadWrite.All`
 
 ## Setup
 
 1. Create `.env` from `.env.example`
 
-2. Fill in:
+2. Fill in (default: Gmail + polling + Teams link):
 
-- `TENANT_ID`, `CLIENT_ID`, `CLIENT_SECRET`
-- `SENDER_USER_PRINCIPAL_NAME` (the mailbox to send from and monitor)
-- `PUBLIC_BASE_URL` (must be public HTTPS, e.g. `https://xxxx.ngrok-free.app`)
-- `GRAPH_CLIENT_STATE` (any random string)
+- `MAIL_MODE=gmail_imap`
+- `GMAIL_ADDRESS`, `GMAIL_APP_PASSWORD`
+- `POLL_INTERVAL_SECONDS` (optional)
+- `TEAMS_TENANT_ID`, `TEAMS_CLIENT_ID`, `TEAMS_CLIENT_SECRET`, `TEAMS_ORGANIZER_UPN`
 - `GEMINI_API_KEY`
 
 3. Install deps
@@ -43,26 +54,33 @@ Then **Grant admin consent**.
 
 4. Run API
 
-- `uvicorn app.main:app --reload --port 8000`
+- From the repo root:
+    - `uvicorn app.main:app --reload --port 8000`
+    - or `python -m app`
 
-## Expose webhook (dev)
+Avoid running `python app/main.py` from inside the `app/` folder, since that breaks package imports.
 
-Microsoft Graph must reach your webhook URL.
+## Notes for Gmail app passwords
 
-Example with ngrok:
+Gmail SMTP/IMAP in this project uses an App Password.
 
-- `ngrok http 8000`
-- Set `PUBLIC_BASE_URL` to the `https://...` URL ngrok prints
+- Enable 2-Step Verification on the Google account
+- Create an App Password and put it in `GMAIL_APP_PASSWORD`
 
-## Create a subscription
+## (Optional) Microsoft Graph webhook mode
 
-Graph subscriptions expire and must be renewed periodically.
+If you set `MAIL_MODE=graph`, the app uses Graph to send mail + receive webhook notifications.
+
+In that mode you also need:
+
+- `TENANT_ID`, `CLIENT_ID`, `CLIENT_SECRET`
+- `SENDER_USER_PRINCIPAL_NAME`
+- `PUBLIC_BASE_URL` (public HTTPS URL, e.g. ngrok)
+- `GRAPH_CLIENT_STATE`
+
+And you must create a subscription:
 
 - `POST http://localhost:8000/admin/subscriptions`
-
-This registers the webhook at:
-
-- `PUBLIC_BASE_URL/graph/notifications`
 
 ## Create a meeting request
 
